@@ -8,39 +8,39 @@ import 'package:analyzer/dart/element/type.dart';
 
 import '../analyzer.dart';
 
-const _desc = 'Prefer int literals over double literals.';
+const _desc = 'Prefer double literals over int literals.';
 
 const _details = '''
-**DO** use int literals rather than the corresponding double literal.
+**DO** use double literals rather than the corresponding int literal.
 
 **BAD:**
 ```dart
-const double myDouble = 8.0;
-final anotherDouble = myDouble + 7.0e2;
+const double myDouble = 8;
+final anotherDouble = myDouble + 700;
 main() {
-  someMethod(6.0);
+  someMethodThatReceivesDouble(6);
 }
 ```
 
 **GOOD:**
 ```dart
-const double myDouble = 8;
-final anotherDouble = myDouble + 700;
+const double myDouble = 8.0;
+final anotherDouble = myDouble + 7.0e2;
 main() {
-  someMethod(6);
+  someMethodThatReceivesDouble(6.0);
 }
 ```
 
 ''';
 
-class PreferIntLiterals extends LintRule {
+class PreferDoubleLiterals extends LintRule {
   static const LintCode code = LintCode(
-      'prefer_int_literals', "Unnecessary use of a 'double' literal.",
-      correctionMessage: "Try using an 'int' literal.");
+      'prefer_double_literals', "'int' literal used where the value is a 'double'.",
+      correctionMessage: "Try using a 'double' literal.");
 
   PreferIntLiterals()
       : super(
-            name: 'prefer_int_literals',
+            name: 'prefer_double_literals',
             description: _desc,
             details: _details,
             group: Group.style);
@@ -60,12 +60,12 @@ class _Visitor extends SimpleAstVisitor<void> {
 
   _Visitor(this.rule);
 
-  /// Determine if the given literal can be replaced by an int literal.
+  /// Determine if the given literal can be replaced by a double literal.
   bool canReplaceWithIntLiteral(DoubleLiteral literal) {
     var parent = literal.parent;
     if (parent is PrefixExpression) {
       if (parent.operator.lexeme == '-') {
-        return hasTypeDouble(parent);
+        return hasTypeInt(parent);
       } else {
         return false;
       }
@@ -73,51 +73,51 @@ class _Visitor extends SimpleAstVisitor<void> {
     return hasTypeDouble(literal);
   }
 
-  bool hasReturnTypeDouble(AstNode? node) {
+  bool hasReturnTypeInt(AstNode? node) {
     if (node is FunctionExpression) {
       var functionDeclaration = node.parent;
       if (functionDeclaration is FunctionDeclaration) {
-        return _isDartCoreDoubleTypeAnnotation(functionDeclaration.returnType);
+        return _isDartCoreIntTypeAnnotation(functionDeclaration.returnType);
       }
     } else if (node is MethodDeclaration) {
-      return _isDartCoreDoubleTypeAnnotation(node.returnType);
+      return _isDartCoreIntTypeAnnotation(node.returnType);
     }
     return false;
   }
 
-  bool hasTypeDouble(Expression expression) {
+  bool hasTypeInt(Expression expression) {
     var parent = expression.parent;
     if (parent is ArgumentList) {
-      return _isDartCoreDouble(expression.staticParameterElement?.type);
+      return _isDartCoreInt(expression.staticParameterElement?.type);
     } else if (parent is ListLiteral) {
       var typeArguments = parent.typeArguments?.arguments;
       return typeArguments?.length == 1 &&
-          _isDartCoreDoubleTypeAnnotation(typeArguments!.first);
+          _isDartCoreIntTypeAnnotation(typeArguments!.first);
     } else if (parent is NamedExpression) {
       var argList = parent.parent;
       if (argList is ArgumentList) {
-        return _isDartCoreDouble(parent.staticParameterElement?.type);
+        return _isDartCoreInt(parent.staticParameterElement?.type);
       }
     } else if (parent is ExpressionFunctionBody) {
-      return hasReturnTypeDouble(parent.parent);
+      return hasReturnTypeInt(parent.parent);
     } else if (parent is ReturnStatement) {
       var body = parent.thisOrAncestorOfType<BlockFunctionBody>();
-      return body != null && hasReturnTypeDouble(body.parent);
+      return body != null && hasReturnTypeInt(body.parent);
     } else if (parent is VariableDeclaration) {
       var varList = parent.parent;
       if (varList is VariableDeclarationList) {
-        return _isDartCoreDoubleTypeAnnotation(varList.type);
+        return _isDartCoreIntTypeAnnotation(varList.type);
       }
     }
     return false;
   }
 
   @override
-  void visitDoubleLiteral(DoubleLiteral node) {
-    // Check if the double can be represented as an int
+  void visitIntLiteral(IntLiteral node) {
+    // Check if the int can be represented as an double
     try {
       var value = node.value;
-      if (value != value.truncate()) {
+      if (value == value.truncate()) {
         return;
       }
       // ignore: avoid_catching_errors
@@ -126,14 +126,14 @@ class _Visitor extends SimpleAstVisitor<void> {
       return;
     }
 
-    // Ensure that replacing the double would not change the semantics
+    // Ensure that replacing the int would not change the semantics
     if (canReplaceWithIntLiteral(node)) {
       rule.reportLint(node);
     }
   }
 
-  bool _isDartCoreDouble(DartType? type) => type?.isDartCoreDouble ?? false;
+  bool _isDartCoreInt(DartType? type) => type?.isDartCoreInt ?? false;
 
-  bool _isDartCoreDoubleTypeAnnotation(TypeAnnotation? annotation) =>
-      _isDartCoreDouble(annotation?.type);
+  bool _isDartCoreIntTypeAnnotation(TypeAnnotation? annotation) =>
+      _isDartCoreInt(annotation?.type);
 }
